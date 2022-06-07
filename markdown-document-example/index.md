@@ -1,17 +1,17 @@
 ---
 title: A Test
 author: Samuel Grayson
-date: \today
+#date: \today
 standalone: yes
 colorlinks: yes
-header-includes:
-  - \usepackage[subtle]{savetrees}
+#header-includes:
+#  - \usepackage[subtle]{savetrees}
 
 # bib settings
 bibliography: bib.json
 citeproc: yes
 ---
 
-Hello world.
+Hello **world**.
 
-[@Williams_2010]
+<!-- [@Williams_2010] -->
