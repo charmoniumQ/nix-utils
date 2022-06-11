@@ -1,7 +1,7 @@
 # nix-utils
 
 This flake provides helper functions in `.lib`. See the source code
-for details: [`nix.flake`][nix.flake]
+for details: [`nix.flake`](nix.flake).
 
 ## Similar projects
 
