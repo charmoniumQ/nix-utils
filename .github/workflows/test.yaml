@@ -9,10 +9,4 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix flake check
       - run: nix fmt
-      - run: |
-          nix fmt
-          if [[ $(git diff --stat) != '' ]]; then
-            git add -A
-            git commit -m 'nix fmt'
-            git push origin ${GITHUB_REF#refs/heads/}
-          fi
+      - run: nix fmt
