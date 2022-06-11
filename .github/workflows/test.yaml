@@ -4,9 +4,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        env:
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
-      - uses: cachix/install-nix-action@v10
+      - uses: cachix/install-nix-action@v17
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix flake check
