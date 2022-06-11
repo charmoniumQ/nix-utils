@@ -32,7 +32,7 @@
             installPhase = ''
               mkdir $out
               for path in $src/*; do
-                cp --recursive $path $out
+                cp --recursive "$path" $out
               done
             '';
             phases = [ "unpackPhase" "installPhase" ];
@@ -55,7 +55,7 @@
                     echo "Error! $path from ${deriv.name} conflicts with a previous path"
                     exit 1
                   fi
-                  cp --recursive $path $out
+                  cp --recursive "$path" $out
                 done
               '';
             in
@@ -89,7 +89,7 @@
               (default name "${builtins.baseNameOf path}")
               { }
               ''
-                cat ${deriv}/${path} > $out
+                cat ${deriv}/"${path}" > $out
               ''
           ;
 
@@ -120,7 +120,7 @@
             test1 = lib.raw-derivation { src = ./tests/test1; };
             test1-file = lib.file-derivation {
               deriv = test1;
-              path = "index";
+              path = "file with space";
             };
           in
           {
@@ -138,7 +138,7 @@
               deriv = lib.merge-derivations {
                 derivations = [ test0 test1 ];
               };
-              paths = [ "test_file" "index" ];
+              paths = [ "test_file" "file with space" ];
             };
 
             test-file-derivation = test1-file;
@@ -148,9 +148,9 @@
                 deriv = test1-file;
                 suffix = ".txt";
               };
-              paths = [ "index.txt" ];
+              paths = [ "file with space.txt" ];
             };
-          };
+          } // packages;
       }
     );
 }
