@@ -11,6 +11,7 @@
         system = "x86_64-linux";
         pkgs = nixpkgs.legacyPackages.${system};
         lib = self.lib.${system};
+        nix-lib = pkgs.lib;
       in
       rec {
         lib = rec {
@@ -38,41 +39,32 @@
               phases = [ "unpackPhase" "installPhase" ];
             };
 
+          trace = val: builtins.trace val val;
+
           mergeDerivations =
-            { derivations
+            { packageSet
             , name ? builtins.concatStringsSep
-                "-"
-                (builtins.map (builtins.getAttr "name") derivations)
-            }:
-            let
-              copyCommand = deriv: ''
-                if [ ! -d ${deriv} ]; then
-                  echo "Error! Derivation ${deriv} should be a directory"
-                  exit 1
-                fi
-                for path in ${deriv}/*; do
-                  if [ -e $out/$path ]; then
-                    echo "Error! $path from ${deriv.name} conflicts with a previous path"
-                    exit 1
-                  fi
-                  cp --recursive "$path" $out
-                done
+              "-"
+              (nix-lib.attrsets.mapAttrsToList (path: deriv: deriv.name) packageSet)
+            }: pkgs.stdenv.mkDerivation {
+              inherit name;
+              src = ./mergeDerivations;
+              installPhase = ''
+                mkdir $out
+                ${pkgs.python310}/bin/python $src/deep_merge.py $out ${nix-lib.strings.escapeShellArgs (
+                  builtins.concatLists (
+                    nix-lib.attrsets.mapAttrsToList
+                      (path: deriv: [deriv.name deriv path])
+                      packageSet))}
               '';
-            in
-            pkgs.runCommand name { } ''
-              mkdir $out
-              ${builtins.concatStringsSep
-                "\n"
-                (builtins.map copyCommand derivations)}
-            '';
+              phases = [ "unpackPhase" "installPhase" ];
+            };
 
           existsInDerivation = { deriv, paths, name ? null }:
             let
               checkPath = path: ''
-                if [ ! -e ${deriv}/${path} ]; then
-                  echo $ ls ${deriv}
-                  ls ${deriv}
-                  echo '${path} does not exist in ${deriv.name} (-> ${deriv})'
+                if [ ! -e "${deriv}/${path}" ]; then
+                  echo '${path} does not exist in ${deriv}'
                   exit 1
                 fi'';
             in
@@ -88,20 +80,7 @@
               (default name "${builtins.baseNameOf path}")
               { }
               ''
-                cat ${deriv}/"${path}" > $out
-              '';
-
-          file2dir = { deriv, suffix, name ? null }:
-            pkgs.runCommand
-              (default name "${deriv.name}-dir")
-              { }
-              ''
-                mkdir $out
-                if [ ! -f ${deriv} ]; then
-                  echo "Error! Derivation ${deriv} should be a file"
-                  exit 1
-                fi
-                cp ${deriv} $out/${deriv.name}${suffix}
+                cp ${deriv}/"${path}" $out
               '';
 
           # [derivations] -> {derivation0.name = derivation0; ...}
@@ -123,6 +102,7 @@
           let
             test0 = lib.srcDerivation { src = ./tests/test0; };
             test1 = lib.srcDerivation { src = ./tests/test1; };
+            test2 = lib.srcDerivation { src = ./tests/test2; };
             test1-file = lib.fileDerivation {
               deriv = test1;
               path = "file with space";
@@ -141,20 +121,26 @@
 
             test-merge-derivations = lib.existsInDerivation {
               deriv = lib.mergeDerivations {
-                derivations = [ test0 test1 ];
+                packageSet = {
+                  "testA" = test0;
+                  "testB/" = test1; # Trailing slash shouldn't matter
+                  "testC/thing" = test2; # Subdirectories should work
+                  "testD" = test1-file; # File should work
+                  "test E" = test0; # File with space should work
+                  "." = test0; # Dot should work
+                };
               };
-              paths = [ "test_file" "file with space" ];
+              paths = [
+                "testA/test_file"
+                "testB/file with space"
+                "testC/thing/test_file2"
+                "testD"
+                "test_file"
+                "test E/test_file"
+              ];
             };
 
             test-file-derivation = test1-file;
-
-            test-file2dir = lib.existsInDerivation {
-              deriv = lib.file2dir {
-                deriv = test1-file;
-                suffix = ".txt";
-              };
-              paths = [ "file with space.txt" ];
-            };
 
             test-packageSet =
               assert (lib.packageSet [ test0 test1 ]) == { test0 = test0; test1 = test1; };
