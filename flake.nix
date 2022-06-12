@@ -25,27 +25,27 @@
             then builtins.getAttr attr set
             else defaultVal;
 
-          # TODO: spaces in filename
-          raw-derivation = { src, name ? null }: pkgs.stdenv.mkDerivation {
-            inherit src;
-            name = default name (builtins.baseNameOf src);
-            installPhase = ''
-              mkdir $out
-              for path in $src/*; do
-                cp --recursive "$path" $out
-              done
-            '';
-            phases = [ "unpackPhase" "installPhase" ];
-          };
+          srcDerivation = { src, name ? builtins.baseNameOf src }:
+            pkgs.stdenv.mkDerivation {
+              inherit src;
+              inherit name;
+              installPhase = ''
+                mkdir $out
+                for path in $src/*; do
+                  cp --recursive "$path" $out
+                done
+              '';
+              phases = [ "unpackPhase" "installPhase" ];
+            };
 
-          merge-derivations = { derivations, name ? null }:
+          mergeDerivations =
+            { derivations
+            , name ? builtins.concatStringsSep
+                "-"
+                (builtins.map (builtins.getAttr "name") derivations)
+            }:
             let
-              name2 = default
-                name
-                (builtins.concatStringsSep
-                  "-"
-                  (builtins.map (builtins.getAttr "name") derivations));
-              copy-command = deriv: ''
+              copyCommand = deriv: ''
                 if [ ! -d ${deriv} ]; then
                   echo "Error! Derivation ${deriv} should be a directory"
                   exit 1
@@ -59,16 +59,16 @@
                 done
               '';
             in
-            pkgs.runCommand name2 { } ''
+            pkgs.runCommand name { } ''
               mkdir $out
               ${builtins.concatStringsSep
                 "\n"
-                (builtins.map copy-command derivations)}
+                (builtins.map copyCommand derivations)}
             '';
 
-          exists-in-derivation = { deriv, paths, name ? null }:
+          existsInDerivation = { deriv, paths, name ? null }:
             let
-              test-path = path: ''
+              checkPath = path: ''
                 if [ ! -e ${deriv}/${path} ]; then
                   echo $ ls ${deriv}
                   ls ${deriv}
@@ -81,10 +81,10 @@
               { }
               (builtins.concatStringsSep
                 "\n"
-                ((builtins.map test-path paths) ++ [ "touch $out" ]))
+                ((builtins.map checkPath paths) ++ [ "touch $out" ]))
           ;
 
-          file-derivation = { deriv, path, name ? null }:
+          fileDerivation = { deriv, path, name ? null }:
             pkgs.runCommand
               (default name "${builtins.baseNameOf path}")
               { }
@@ -106,6 +106,12 @@
                 cp ${deriv} $out/${deriv.name}${suffix}
               ''
           ;
+
+          # [derivations] -> {derivation0.name = derivation0; ...}
+          packageSet = derivations:
+            builtins.listToAttrs
+              (builtins.map (deriv: { name = deriv.name; value = deriv; }) derivations);
+
         };
 
         packages = {
@@ -116,9 +122,9 @@
 
         checks =
           let
-            test0 = lib.raw-derivation { src = ./tests/test0; };
-            test1 = lib.raw-derivation { src = ./tests/test1; };
-            test1-file = lib.file-derivation {
+            test0 = lib.srcDerivation { src = ./tests/test0; };
+            test1 = lib.srcDerivation { src = ./tests/test1; };
+            test1-file = lib.fileDerivation {
               deriv = test1;
               path = "file with space";
             };
@@ -129,13 +135,13 @@
               [ -z $(ls ${packages.empty} ) ]
               mkdir $out
             '';
-            test-raw-derivation = lib.exists-in-derivation {
+            test-raw-derivation = lib.existsInDerivation {
               deriv = test0;
               paths = [ "test_file" ];
             };
 
-            test-merge-derivations = lib.exists-in-derivation {
-              deriv = lib.merge-derivations {
+            test-merge-derivations = lib.existsInDerivation {
+              deriv = lib.mergeDerivations {
                 derivations = [ test0 test1 ];
               };
               paths = [ "test_file" "file with space" ];
@@ -143,13 +149,17 @@
 
             test-file-derivation = test1-file;
 
-            test-file2dir = lib.exists-in-derivation {
+            test-file2dir = lib.existsInDerivation {
               deriv = lib.file2dir {
                 deriv = test1-file;
                 suffix = ".txt";
               };
               paths = [ "file with space.txt" ];
             };
+
+            test-packageSet =
+              assert (lib.packageSet [ test0 test1 ]) == { test0 = test0; test1 = test1; };
+              packages.empty;
           } // packages;
       }
     );
