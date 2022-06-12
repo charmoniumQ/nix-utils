@@ -8,7 +8,6 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        system = "x86_64-linux";
         pkgs = nixpkgs.legacyPackages.${system};
         lib = self.lib.${system};
         nix-lib = pkgs.lib;
