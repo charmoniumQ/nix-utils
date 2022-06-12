@@ -42,10 +42,14 @@
 
           mergeDerivations =
             { packageSet
-            , name ? builtins.concatStringsSep
-                "-"
-                (nix-lib.attrsets.mapAttrsToList (path: deriv: deriv.name) packageSet)
-            }: pkgs.stdenv.mkDerivation {
+            , name ? "merge"
+            }: let
+              getName = deriv:
+                if nix-lib.attrsets.isDerivation deriv then deriv.name else (
+                  if (builtins.isPath deriv) || (builtins.isString deriv) then builtins.baseNameOf deriv else
+                    builtins.throw "Unknown type ${builtins.typeOf deriv}");
+              in
+              pkgs.stdenv.mkDerivation {
               inherit name;
               src = ./mergeDerivations;
               installPhase = ''
@@ -53,13 +57,17 @@
                 ${pkgs.python310}/bin/python $src/deep_merge.py $out ${nix-lib.strings.escapeShellArgs (
                   builtins.concatLists (
                     nix-lib.attrsets.mapAttrsToList
-                      (path: deriv: [deriv.name deriv path])
+                      (path: derivs:
+                        if builtins.isList derivs
+                        then builtins.concatLists (
+                          builtins.map (deriv: [(getName deriv) deriv path]) derivs)
+                        else [(getName derivs) derivs path])
                       packageSet))}
               '';
               phases = [ "unpackPhase" "installPhase" ];
             };
 
-          existsInDerivation = { deriv, paths, name ? null }:
+          existsInDerivation = { deriv, paths, name ? "exists-in-${deriv.name}" }:
             let
               checkPath = path: ''
                 if [ ! -e "${deriv}/${path}" ]; then
@@ -68,7 +76,7 @@
                 fi'';
             in
             pkgs.runCommand
-              (default name "exists-in-${deriv.name}")
+              name
               { }
               (builtins.concatStringsSep
                 "\n"
@@ -127,6 +135,8 @@
                   "testD" = test1-file; # File should work
                   "test E" = test0; # File with space should work
                   "." = test0; # Dot should work
+                  "testF" = [test0 test1]; # list should work
+                  "testG" = "${test0}"; # path should work
                 };
               };
               paths = [
@@ -136,6 +146,9 @@
                 "testD"
                 "test_file"
                 "test E/test_file"
+                "testF/test_file"
+                "testF/file with space"
+                "testG/test_file"
               ];
             };
 
