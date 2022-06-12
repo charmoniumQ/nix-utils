@@ -44,8 +44,8 @@
           mergeDerivations =
             { packageSet
             , name ? builtins.concatStringsSep
-              "-"
-              (nix-lib.attrsets.mapAttrsToList (path: deriv: deriv.name) packageSet)
+                "-"
+                (nix-lib.attrsets.mapAttrsToList (path: deriv: deriv.name) packageSet)
             }: pkgs.stdenv.mkDerivation {
               inherit name;
               src = ./mergeDerivations;
