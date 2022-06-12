@@ -81,8 +81,7 @@
               { }
               (builtins.concatStringsSep
                 "\n"
-                ((builtins.map checkPath paths) ++ [ "touch $out" ]))
-          ;
+                ((builtins.map checkPath paths) ++ [ "touch $out" ]));
 
           fileDerivation = { deriv, path, name ? null }:
             pkgs.runCommand
@@ -90,8 +89,7 @@
               { }
               ''
                 cat ${deriv}/"${path}" > $out
-              ''
-          ;
+              '';
 
           file2dir = { deriv, suffix, name ? null }:
             pkgs.runCommand
@@ -104,13 +102,14 @@
                   exit 1
                 fi
                 cp ${deriv} $out/${deriv.name}${suffix}
-              ''
-          ;
+              '';
 
           # [derivations] -> {derivation0.name = derivation0; ...}
           packageSet = derivations:
             builtins.listToAttrs
               (builtins.map (deriv: { name = deriv.name; value = deriv; }) derivations);
+
+          renameDerivation = name: deriv: deriv // { inherit name; };
 
         };
 
@@ -160,6 +159,11 @@
             test-packageSet =
               assert (lib.packageSet [ test0 test1 ]) == { test0 = test0; test1 = test1; };
               packages.empty;
+
+            test-renameDerivation =
+              assert (lib.renameDerivation "test123" test0).name == "test123";
+              packages.empty;
+
           } // packages;
       }
     );
