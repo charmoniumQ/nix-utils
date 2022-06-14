@@ -21,11 +21,13 @@ def walkdir(path):
 
 for src_name, src, subpath in chunk(sys.argv[2:], 3):
     src = pathlib.Path(src)
-    print(src, "->", dst / subpath)
+    print("Mounting", src_name, "at", subpath)
     for subfile in walkdir(src):
         subfile = subfile.relative_to(src)
         src_subfile = src / subfile
         dst_subfile = dst / subpath / subfile
+        if not src_subfile.exists():
+            print(f"{src_subfile} does not exist or is not accessible inside the Nix sandbox")
         if src_subfile.is_dir():
             if dst_subfile.exists():
                 if dst_subfile.is_file():
@@ -34,7 +36,7 @@ for src_name, src, subpath in chunk(sys.argv[2:], 3):
             else:
                 dst_subfile.mkdir(parents=True)
                 dst_map[dst_subfile] = src_name
-        else:
+        elif src_subfile.is_file():
             if dst_subfile.exists():
                 print(f"{subfile} in {src_name} conflicts with {subfile} in {dst_map.get(dst_subfile, '<unknown package>')}")
                 sys.exit(1)
@@ -42,3 +44,5 @@ for src_name, src, subpath in chunk(sys.argv[2:], 3):
                 print(f"{src_name}/{subfile} -> $out/{subpath}/{subfile}")
                 shutil.copy(src_subfile, dst_subfile)
                 dst_map[dst_subfile] = src_name
+        else:
+            print(f"{src_subfile} is an illegal file type")

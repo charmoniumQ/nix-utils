@@ -43,13 +43,16 @@
           mergeDerivations =
             { packageSet
             , name ? "merge"
-            }: let
+            }:
+            let
               getName = deriv:
-                if nix-lib.attrsets.isDerivation deriv then deriv.name else (
+                if nix-lib.attrsets.isDerivation deriv then deriv.name else
+                (
                   if (builtins.isPath deriv) || (builtins.isString deriv) then builtins.baseNameOf deriv else
-                    builtins.throw "Unknown type ${builtins.typeOf deriv}");
-              in
-              pkgs.stdenv.mkDerivation {
+                  builtins.throw "Unknown type ${builtins.typeOf deriv}"
+                );
+            in
+            pkgs.stdenv.mkDerivation {
               inherit name;
               src = ./mergeDerivations;
               installPhase = ''
@@ -135,7 +138,7 @@
                   "testD" = test1-file; # File should work
                   "test E" = test0; # File with space should work
                   "." = test0; # Dot should work
-                  "testF" = [test0 test1]; # list should work
+                  "testF" = [ test0 test1 ]; # list should work
                   "testG" = "${test0}"; # path should work
                 };
               };
