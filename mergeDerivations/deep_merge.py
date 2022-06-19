@@ -28,6 +28,7 @@ for src_name, src, subpath in chunk(sys.argv[2:], 3):
         dst_subfile = dst / subpath / subfile
         if not src_subfile.exists():
             print(f"{src_subfile} does not exist or is not accessible inside the Nix sandbox")
+            sys.exit(1)
         if src_subfile.is_dir():
             if dst_subfile.exists():
                 if dst_subfile.is_file():
