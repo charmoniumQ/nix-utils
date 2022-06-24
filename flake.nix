@@ -94,9 +94,15 @@
               '';
 
           # [derivations] -> {derivation0.name = derivation0; ...}
-          packageSet = derivations:
-            builtins.listToAttrs
-              (builtins.map (deriv: { name = deriv.name; value = deriv; }) derivations);
+          packageSet = derivations: packageSetRec (self: derivations);
+
+          packageSetRec = derivations:
+            nix-lib.fix
+              (self:
+                builtins.listToAttrs
+                  (builtins.map
+                    (deriv: { name = deriv.name; value = deriv; })
+                    (derivations self)));
 
           renameDerivation = name: deriv: deriv // { inherit name; };
 
@@ -158,7 +164,22 @@
             test-file-derivation = test1-file;
 
             test-packageSet =
-              assert (lib.packageSet [ test0 test1 ]) == { test0 = test0; test1 = test1; };
+              assert (lib.packageSet [ test0 test1 ]) == {
+                test0 = test0;
+                test1 = test1;
+              };
+              packages.empty;
+
+            test-packageSetRec =
+              assert nix-lib.attrsets.mapAttrsToList (key: val: key) (lib.packageSetRec (self: [
+                test0
+                test1
+                (lib.existsInDerivation {
+                  deriv = self.test0;
+                  paths = ["test_file"];
+                  name = "test2";
+                })
+              ])) == ["test0" "test1" "test2"];
               packages.empty;
 
             test-renameDerivation =
