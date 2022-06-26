@@ -106,6 +106,28 @@
 
           renameDerivation = name: deriv: deriv // { inherit name; };
 
+          listOfListOfArgs = lines:
+            builtins.concatStringsSep
+              "\n"
+              (builtins.map
+                (line:
+                  builtins.concatStringsSep
+                  " "
+                  (
+                    builtins.map
+                    (arg:
+                      if builtins.isString arg
+                      then nix-lib.strings.escapeShellArg arg
+                      else
+                        if builtins.isAttrs arg
+                        then getAttrOr arg "literal" (builtins.throw "Attrset shoudl have a literal attr")
+                        else builtins.throw "Unknown type ${builtins.typeOf arg}"
+                    )
+                    (nix-lib.lists.flatten line)
+                  )
+                )
+                (lines ++ [{literal="";}])
+              );
         };
 
         packages = {
@@ -184,6 +206,14 @@
 
             test-renameDerivation =
               assert (lib.renameDerivation "test123" test0).name == "test123";
+              packages.empty;
+
+            test-listOfListOfArgs = 
+              assert (lib.listOfListOfArgs [
+                [ "a" "b" "c" ]
+                [ "d" "e" "f" ]
+                [ "g" "h" {literal="i";} ]
+              ]) == "'a' 'b' 'c'\n'd' 'e' 'f'\n'g' 'h' i\n";
               packages.empty;
 
           } // packages;
