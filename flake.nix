@@ -26,7 +26,7 @@
             else defaultVal;
 
           srcDerivation = { src, name ? builtins.baseNameOf src }:
-            pkgs.stdenv.mkDerivation {
+            pkgs.stdenvNoCC.mkDerivation {
               inherit src;
               inherit name;
               installPhase = ''
@@ -46,13 +46,14 @@
             }:
             let
               getName = deriv:
-                if nix-lib.attrsets.isDerivation deriv then deriv.name else
-                (
-                  if (builtins.isPath deriv) || (builtins.isString deriv) then builtins.baseNameOf deriv else
-                  builtins.throw "Unknown type ${builtins.typeOf deriv}"
-                );
+                if nix-lib.attrsets.isDerivation deriv
+                then deriv.name
+                else
+                  if (builtins.isPath deriv) || (builtins.isString deriv)
+                  then builtins.baseNameOf deriv
+                  else builtins.throw "Unknown type ${builtins.typeOf deriv}";
             in
-            pkgs.stdenv.mkDerivation {
+            pkgs.stdenvNoCC.mkDerivation {
               inherit name;
               src = ./mergeDerivations;
               installPhase = ''
@@ -63,8 +64,8 @@
                       (path: derivs:
                         if builtins.isList derivs
                         then builtins.concatLists (
-                          builtins.map (deriv: [(getName deriv) deriv path]) derivs)
-                        else [(getName derivs) derivs path])
+                          builtins.map (deriv: [(getName deriv) "${deriv}" path]) derivs)
+                        else [(getName derivs) "${derivs}" path])
                       packageSet))}
               '';
               phases = [ "unpackPhase" "installPhase" ];
@@ -117,7 +118,9 @@
                     builtins.map
                     (arg:
                       if builtins.isString arg
-                      then nix-lib.strings.escapeShellArg arg
+                      then if arg == ""
+                        then builtins.throw "Arg cannot be empty string"
+                        else nix-lib.strings.escapeShellArg arg
                       else
                         if builtins.isAttrs arg
                         then getAttrOr arg "literal" (builtins.throw "Attrset shoudl have a literal attr")
@@ -167,7 +170,7 @@
                   "test E" = test0; # File with space should work
                   "." = test0; # Dot should work
                   "testF" = [ test0 test1 ]; # list should work
-                  "testG" = "${test0}"; # path should work
+                  "testG" = ./tests/test3; # path outside of Nix store should work
                 };
               };
               paths = [
@@ -179,7 +182,7 @@
                 "test E/test_file"
                 "testF/test_file"
                 "testF/file with space"
-                "testG/test_file"
+                "testG/test_file3"
               ];
             };
 
