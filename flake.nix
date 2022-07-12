@@ -86,12 +86,12 @@
                 "\n"
                 ((builtins.map checkPath paths) ++ [ "touch $out" ]));
 
-          fileDerivation = { deriv, path, name ? null }:
+          selectInDerivation = { deriv, path, name ? null }:
             pkgs.runCommand
               (default name "${builtins.baseNameOf path}")
               { }
               ''
-                cp ${deriv}/"${path}" $out
+                cp --recursive ${deriv}/"${path}" $out
               '';
 
           # [derivations] -> {derivation0.name = derivation0; ...}
@@ -113,23 +113,23 @@
               (builtins.map
                 (line:
                   builtins.concatStringsSep
-                  " "
-                  (
-                    builtins.map
-                    (arg:
-                      if builtins.isString arg
-                      then if arg == ""
-                        then builtins.throw "Arg cannot be empty string"
-                        else nix-lib.strings.escapeShellArg arg
-                      else
-                        if builtins.isAttrs arg
-                        then getAttrOr arg "literal" (builtins.throw "Attrset shoudl have a literal attr")
-                        else builtins.throw "Unknown type ${builtins.typeOf arg}"
+                    " "
+                    (
+                      builtins.map
+                        (arg:
+                          if builtins.isString arg
+                          then if arg == ""
+                          then builtins.throw "Arg cannot be empty string"
+                          else nix-lib.strings.escapeShellArg arg
+                          else
+                            if builtins.isAttrs arg
+                            then getAttrOr arg "literal" (builtins.throw "Attrset shoudl have a literal attr")
+                            else builtins.throw "Unknown type ${builtins.typeOf arg}"
+                        )
+                        (nix-lib.lists.flatten line)
                     )
-                    (nix-lib.lists.flatten line)
-                  )
                 )
-                (lines ++ [{literal="";}])
+                (lines ++ [{ literal = ""; }])
               );
         };
 
@@ -144,7 +144,7 @@
             test0 = lib.srcDerivation { src = ./tests/test0; };
             test1 = lib.srcDerivation { src = ./tests/test1; };
             test2 = lib.srcDerivation { src = ./tests/test2; };
-            test1-file = lib.fileDerivation {
+            test1-file = lib.selectInDerivation {
               deriv = test1;
               path = "file with space";
             };
@@ -196,26 +196,27 @@
               packages.empty;
 
             test-packageSetRec =
-              assert nix-lib.attrsets.mapAttrsToList (key: val: key) (lib.packageSetRec (self: [
-                test0
-                test1
-                (lib.existsInDerivation {
-                  deriv = self.test0;
-                  paths = ["test_file"];
-                  name = "test2";
-                })
-              ])) == ["test0" "test1" "test2"];
+              assert nix-lib.attrsets.mapAttrsToList (key: val: key)
+                (lib.packageSetRec (self: [
+                  test0
+                  test1
+                  (lib.existsInDerivation {
+                    deriv = self.test0;
+                    paths = [ "test_file" ];
+                    name = "test2";
+                  })
+                ])) == [ "test0" "test1" "test2" ];
               packages.empty;
 
             test-renameDerivation =
               assert (lib.renameDerivation "test123" test0).name == "test123";
               packages.empty;
 
-            test-listOfListOfArgs = 
+            test-listOfListOfArgs =
               assert (lib.listOfListOfArgs [
                 [ "a" "b" "c" ]
                 [ "d" "e" "f" ]
-                [ "g" "h" {literal="i";} ]
+                [ "g" "h" { literal = "i"; } ]
               ]) == "'a' 'b' 'c'\n'd' 'e' 'f'\n'g' 'h' i\n";
               packages.empty;
 
